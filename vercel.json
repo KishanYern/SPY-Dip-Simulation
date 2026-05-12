@@ -1,0 +1,15 @@
+{
+  "functions": {
+    "api/refresh.py": {
+      "maxDuration": 60
+    }
+  },
+  "headers": [
+    {
+      "source": "/spy_data.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
+    }
+  ]
+}

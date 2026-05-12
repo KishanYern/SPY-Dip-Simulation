@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPY Dip Buyer Simulator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #60a5fa;
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 2rem;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--text-main);
+            grid-column: 1 / -1;
+            text-align: center;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        input[type="number"], input[type="range"] {
+            width: 100%;
+            background: var(--bg-color);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 0.5rem;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        input[type="number"]:focus {
+            border-color: var(--accent);
+        }
+
+        .range-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .range-value {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        button {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.75rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: var(--accent-hover);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background: var(--bg-color);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-top: 0.25rem;
+        }
+
+        .stat-value.positive { color: var(--success); }
+        .stat-value.negative { color: var(--danger); }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+
+        .log-container {
+            margin-top: 2rem;
+            max-height: 300px;
+            overflow-y: auto;
+            background: var(--panel-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: rgba(0,0,0,0.2);
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            position: sticky;
+            top: 0;
+            backdrop-filter: blur(4px);
+        }
+
+        tbody tr:hover {
+            background: rgba(255,255,255,0.02);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>📈 SPY Dip Buyer Simulator</h1>
+
+        <div class="panel controls">
+            <div class="control-group">
+                <label>Budget ($)</label>
+                <input type="number" id="budget" value="20000" step="1000">
+            </div>
+
+            <div class="control-group">
+                <div class="range-header">
+                    <label>Dip Threshold (%)</label>
+                    <span class="range-value" id="threshold-val">0.5%</span>
+                </div>
+                <input type="range" id="threshold" min="0.1" max="5.0" step="0.1" value="0.5">
+            </div>
+
+            <div class="control-group">
+                <label>Invest per Trigger ($)</label>
+                <input type="number" id="invest-amount" value="100" step="10">
+            </div>
+
+            <div class="control-group">
+                <label>Start Year</label>
+                <input type="number" id="start-year" value="2010" min="1993" max="2026">
+            </div>
+
+            <div class="control-group">
+                <label>End Year</label>
+                <input type="number" id="end-year" value="2026" min="1993" max="2026">
+            </div>
+
+            <button onclick="runSimulation()">Run Simulation</button>
+            <button onclick="refreshData()" style="background: var(--border); color: var(--text-main);">Force Fetch Latest SPY Data</button>
+        </div>
+
+        <div class="panel main-content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Invested (Dip Buys)</div>
+                    <div class="stat-value" id="stat-invested">$0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Dip Buyer Final Value</div>
+                    <div class="stat-value" id="stat-value">$0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Dip Buyer Return</div>
+                    <div class="stat-value" id="stat-return">0%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Dip Days Qualified</div>
+                    <div class="stat-value" id="stat-qualifying">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Actual Buys (Budget)</div>
+                    <div class="stat-value" id="stat-triggers">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Remaining Cash</div>
+                    <div class="stat-value" id="stat-remaining">$0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">SPY Buy &amp; Hold Value</div>
+                    <div class="stat-value positive" id="stat-spy">$0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">DCA Final Value</div>
+                    <div class="stat-value" id="stat-dca-value" style="color: #10b981;">$0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">DCA Rate ($/day)</div>
+                    <div class="stat-value" id="stat-dca-rate" style="color: #10b981;">$0</div>
+                    <div style="font-size:0.7rem; color: var(--text-muted); margin-top:0.2rem;" id="stat-dca-days"></div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="portfolioChart"></canvas>
+            </div>
+        </div>
+
+        <div class="log-container" style="grid-column: 1 / -1;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Open</th>
+                        <th>Low</th>
+                        <th>Dip %</th>
+                        <th>Fill Price (Limit)</th>
+                        <th>Shares Bought</th>
+                    </tr>
+                </thead>
+                <tbody id="log-body">
+                    <!-- Logs go here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let spyData = null;
+        let chart = null;
+
+        // UI Listeners
+        document.getElementById('threshold').addEventListener('input', (e) => {
+            document.getElementById('threshold-val').textContent = e.target.value + '%';
+            runSimulation();
+        });
+
+        ['budget', 'invest-amount', 'start-year', 'end-year'].forEach(id => {
+            document.getElementById(id).addEventListener('input', runSimulation);
+        });
+
+        async function loadData() {
+            try {
+                const res = await fetch('/spy_data.json');
+                if (!res.ok) throw new Error("Data not found");
+                spyData = await res.json();
+                runSimulation();
+            } catch (err) {
+                console.error(err);
+                alert("Could not load SPY data. Please run fetch_data.py first, or run the server.");
+            }
+        }
+
+        async function refreshData() {
+            try {
+                const res = await fetch('/api/refresh', { method: 'POST' });
+                const result = await res.json();
+                if (result.ok && result.data) {
+                    spyData = result.data;
+                    runSimulation();
+                    alert("Data refreshed successfully!");
+                } else {
+                    alert("Error refreshing: " + (result.msg || "Unknown error"));
+                }
+            } catch (err) {
+                alert("Error connecting to server to refresh data.");
+            }
+        }
+
+        function runSimulation() {
+            if (!spyData) return;
+
+            const budget = parseFloat(document.getElementById('budget').value);
+            const threshold = parseFloat(document.getElementById('threshold').value) / 100;
+            const investAmount = parseFloat(document.getElementById('invest-amount').value);
+            const startYear = parseInt(document.getElementById('start-year').value);
+            const endYear = parseInt(document.getElementById('end-year').value);
+
+            // Input validation
+            if (!budget || budget <= 0 || !investAmount || investAmount <= 0 ||
+                isNaN(startYear) || isNaN(endYear) || endYear < startYear) return;
+
+            // Build filtered window indices
+            const windowIndices = [];
+            for (let i = 0; i < spyData.dates.length; i++) {
+                const year = parseInt(spyData.dates[i].substring(0, 4));
+                if (year >= startYear && year <= endYear) windowIndices.push(i);
+            }
+            if (windowIndices.length === 0) return;
+
+            let remainingBudget = budget;
+            let shares = 0;
+            let totalInvested = 0;
+            let triggers = 0;        // actual buys (limited by budget)
+            let qualifyingDays = 0; // all days threshold was met (regardless of budget)
+
+            const logs = [];
+            const portfolioHistory = [];
+            const dates = [];
+
+            const totalTradingDays = windowIndices.length;
+
+            // --- DCA Baseline ---
+            const dcaPerDay = budget / totalTradingDays;
+            let dcaShares = 0;
+            let dcaSpent = 0;
+            const dcaHistory = [];
+
+            // --- SPY Buy & Hold Baseline ---
+            let spyShares = 0;
+            let spyInitialized = false;
+            const spyHistory = [];
+
+            // --- Cash Baseline (risk-free rate ~4.5% HYSA/T-bill) ---
+            const annualRiskFreeRate = 0.045;
+            const dailyRiskFreeRate = Math.pow(1 + annualRiskFreeRate, 1 / 252) - 1;
+            let cashValue = budget;
+            const cashHistory = [];
+
+            for (const idx of windowIndices) {
+                const date = spyData.dates[idx];
+                const open = spyData.open[idx];
+                const low = spyData.low[idx];
+                const close = spyData.close[idx];
+
+                const currentDip = (open - low) / open;
+
+                // Count every day the dip threshold is met (budget-independent)
+                if (currentDip >= threshold) {
+                    qualifyingDays++;
+
+                    // Only actually buy if budget remains
+                    if (remainingBudget > 0) {
+                        const amountToInvest = Math.min(investAmount, remainingBudget);
+                        // Limit-order fill: assumes order triggers at open × (1 - threshold)
+                        const fillPrice = open * (1 - threshold);
+                        const sharesBought = amountToInvest / fillPrice;
+
+                        shares += sharesBought;
+                        remainingBudget -= amountToInvest;
+                        totalInvested += amountToInvest;
+                        triggers++;
+
+                        logs.push({
+                            date, open, low,
+                            dip: (currentDip * 100).toFixed(2),
+                            fillPrice, sharesBought: sharesBought.toFixed(4)
+                        });
+                    }
+                }
+
+                // Record portfolio value (cash + stock value at close)
+                portfolioHistory.push(remainingBudget + (shares * close));
+                dates.push(date);
+
+                // DCA: invest budget/totalTradingDays every trading day
+                const amountToday = Math.min(dcaPerDay, budget - dcaSpent);
+                if (amountToday > 0) {
+                    dcaShares += amountToday / close;
+                    dcaSpent += amountToday;
+                }
+                // Total wealth: uninvested cash + equity (apples-to-apples with other strategies)
+                dcaHistory.push((budget - dcaSpent) + dcaShares * close);
+
+                // SPY B&H: buy all on day 1
+                if (!spyInitialized) {
+                    spyShares = budget / close;
+                    spyInitialized = true;
+                }
+                spyHistory.push(spyShares * close);
+
+                // Cash: compound at risk-free rate
+                cashValue *= (1 + dailyRiskFreeRate);
+                cashHistory.push(cashValue);
+            }
+
+            // Use window-relative final price (last day in the filtered window)
+            const lastWindowIdx = windowIndices[windowIndices.length - 1];
+            const finalPrice = spyData.close[lastWindowIdx];
+            const finalValue = remainingBudget + (shares * finalPrice);
+            const totalReturn = ((finalValue - budget) / budget) * 100;
+
+            const spyFinalValue = spyShares * finalPrice;
+            const dcaFinalValue = (budget - dcaSpent) + dcaShares * finalPrice;
+
+            updateUI(totalInvested, finalValue, totalReturn, triggers, qualifyingDays,
+                     remainingBudget, logs, dates, portfolioHistory, budget,
+                     dcaHistory, dcaPerDay, totalTradingDays,
+                     spyHistory, spyFinalValue, dcaFinalValue, cashHistory);
+        }
+
+        function updateUI(invested, finalVal, ret, triggerCount, qualifyingDays,
+                          remainingCash, logs, dates, history, budget,
+                          dcaHistory, dcaPerDay, totalTradingDays,
+                          spyHistory, spyFinalValue, dcaFinalValue, cashHistory) {
+            document.getElementById('stat-invested').textContent = '$' + invested.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('stat-value').textContent = '$' + finalVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            
+            const retEl = document.getElementById('stat-return');
+            retEl.textContent = ret.toFixed(2) + '%';
+            retEl.className = 'stat-value ' + (ret >= 0 ? 'positive' : 'negative');
+
+            document.getElementById('stat-qualifying').textContent = qualifyingDays.toLocaleString();
+            document.getElementById('stat-triggers').textContent = triggerCount.toLocaleString();
+            document.getElementById('stat-remaining').textContent = '$' + remainingCash.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('stat-spy').textContent = '$' + spyFinalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('stat-dca-value').textContent = '$' + dcaFinalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('stat-dca-rate').textContent = '$' + dcaPerDay.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('stat-dca-days').textContent = 'budget ÷ ' + totalTradingDays.toLocaleString() + ' trading days';
+
+            // Render Chart
+            if (chart) chart.destroy();
+            const ctx = document.getElementById('portfolioChart').getContext('2d');
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Dip Buyer Portfolio Value',
+                            data: history,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: true,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Baseline (DCA)',
+                            data: dcaHistory,
+                            borderColor: '#10b981',
+                            borderWidth: 2,
+                            borderDash: [6, 3],
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Baseline (SPY Buy & Hold)',
+                            data: spyHistory,
+                            borderColor: '#f59e0b',
+                            borderWidth: 2,
+                            borderDash: [3, 3],
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Baseline (Cash @ ~4.5% APY)',
+                            data: cashHistory,
+                            borderColor: '#94a3b8',
+                            borderWidth: 1,
+                            borderDash: [4, 4],
+                            pointRadius: 0,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { labels: { color: '#f8fafc' } },
+                        tooltip: { backgroundColor: '#1e293b', titleColor: '#f8fafc', bodyColor: '#cbd5e1', borderColor: '#334155', borderWidth: 1 }
+                    },
+                    scales: {
+                        x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', maxTicksLimit: 10 } },
+                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', callback: (val) => '$' + val.toLocaleString() } }
+                    }
+                }
+            });
+
+            // Render Logs
+            const tbody = document.getElementById('log-body');
+            tbody.innerHTML = '';
+            // Show last 100 logs to prevent freezing
+            const logsToShow = logs.slice(-100).reverse();
+            for (const log of logsToShow) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${log.date}</td>
+                    <td>$${log.open.toFixed(2)}</td>
+                    <td>$${log.low.toFixed(2)}</td>
+                    <td style="color: #ef4444">-${log.dip}%</td>
+                    <td>$${log.fillPrice.toFixed(2)}</td>
+                    <td>${log.sharesBought}</td>
+                `;
+                tbody.appendChild(tr);
+            }
+            if (logs.length > 100) {
+                 const tr = document.createElement('tr');
+                 tr.innerHTML = `<td colspan="6" style="text-align:center; color: #94a3b8;">... showing last 100 triggers out of ${logs.length} total ...</td>`;
+                 tbody.appendChild(tr);
+            }
+        }
+
+        // Init
+        loadData();
+    </script>
+</body>
+</html>
