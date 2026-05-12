@@ -1,7 +1,8 @@
 {
   "functions": {
     "api/refresh.py": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "runtime": "vercel-python@4.x"
     }
   },
   "headers": [
