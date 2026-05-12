@@ -1,57 +1,57 @@
 """
 Vercel serverless function — fetches live SPY OHLC data via yfinance
 and returns it as JSON (no filesystem writes).
+Uses BaseHTTPRequestHandler — the correct interface for Vercel Python functions.
 """
+from http.server import BaseHTTPRequestHandler
 import json
 from datetime import datetime, timezone
 
 
-def handler(request):
-    """Vercel Python serverless handler."""
-    if request.method == "OPTIONS":
-        return Response("", status=200, headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
-        })
+class handler(BaseHTTPRequestHandler):
 
-    if request.method != "POST":
-        return Response(
-            json.dumps({"ok": False, "msg": "Method not allowed"}),
-            status=405,
-            headers={"Content-Type": "application/json"},
-        )
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self._set_cors_headers()
+        self.end_headers()
 
-    try:
-        import yfinance as yf
+    def do_POST(self):
+        try:
+            import yfinance as yf
 
-        end = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        ticker = yf.Ticker("SPY")
-        df = ticker.history(start="1993-01-01", end=end, auto_adjust=True)
-        df = df.dropna(subset=["Open", "High", "Low", "Close"])
-        df = df.sort_index()
+            end = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            ticker = yf.Ticker("SPY")
+            df = ticker.history(start="1993-01-01", end=end, auto_adjust=True)
+            df = df.dropna(subset=["Open", "High", "Low", "Close"])
+            df = df.sort_index()
 
-        data = {
-            "dates": df.index.strftime("%Y-%m-%d").tolist(),
-            "open":  [round(float(x), 4) for x in df["Open"]],
-            "high":  [round(float(x), 4) for x in df["High"]],
-            "low":   [round(float(x), 4) for x in df["Low"]],
-            "close": [round(float(x), 4) for x in df["Close"]],
-            "fetched_at": datetime.now(timezone.utc).isoformat(),
-        }
+            data = {
+                "dates": df.index.strftime("%Y-%m-%d").tolist(),
+                "open":  [round(float(x), 4) for x in df["Open"]],
+                "high":  [round(float(x), 4) for x in df["High"]],
+                "low":   [round(float(x), 4) for x in df["Low"]],
+                "close": [round(float(x), 4) for x in df["Close"]],
+                "fetched_at": datetime.now(timezone.utc).isoformat(),
+            }
 
-        return Response(
-            json.dumps({"ok": True, "data": data}),
-            status=200,
-            headers={
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-            },
-        )
+            body = json.dumps({"ok": True, "data": data}).encode()
+            self.send_response(200)
+            self._set_cors_headers()
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
 
-    except Exception as e:
-        return Response(
-            json.dumps({"ok": False, "msg": str(e)}),
-            status=500,
-            headers={"Content-Type": "application/json"},
-        )
+        except Exception as e:
+            body = json.dumps({"ok": False, "msg": str(e)}).encode()
+            self.send_response(500)
+            self._set_cors_headers()
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    def _set_cors_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
